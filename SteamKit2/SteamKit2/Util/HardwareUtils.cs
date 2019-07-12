@@ -19,24 +19,15 @@ namespace SteamKit2
     {
         public static MachineInfoProvider GetProvider()
         {
-            switch ( Environment.OSVersion.Platform )
-            {
-                case PlatformID.Win32NT:
-                case PlatformID.Win32Windows:
-                    return new WindowsInfoProvider();
-
-                case PlatformID.Unix:
-                    if ( Utils.IsMacOS() )
-                    {
-                        return new OSXInfoProvider();
-                    }
-                    else
-                    {
-                        return new LinuxInfoProvider();
-                    }
-            }
-
+            #if UNITY_STANDALONE_WIN
+            return new WindowsInfoProvider();
+            #elif UNITY_STANDALONE_LINUX
+            return new LinuxInfoProvider();
+            #elif UNITY_STANDALONE_OSX
+            return new OSXInfoProvider();
+            #else
             return new DefaultInfoProvider();
+            #endif
         }
 
         public abstract byte[] GetMachineGuid();
@@ -81,6 +72,7 @@ namespace SteamKit2
         }
     }
 
+    #if UNITY_STANDALONE_WIN
     class WindowsInfoProvider : DefaultInfoProvider
     {
         public override byte[] GetMachineGuid()
@@ -116,7 +108,9 @@ namespace SteamKit2
             return Encoding.UTF8.GetBytes( serialNumber );
         }
     }
+    #endif
 
+    #if UNITY_STANDALONE_LINUX
     class LinuxInfoProvider : DefaultInfoProvider
     {
         public override byte[] GetMachineGuid()
@@ -222,7 +216,9 @@ namespace SteamKit2
             return paramString.Substring( param.Length );
         }
     }
+    #endif
 
+    #if UNITY_STANDALONE_OSX
     class OSXInfoProvider : DefaultInfoProvider
     {
         public override byte[] GetMachineGuid()
@@ -280,6 +276,7 @@ namespace SteamKit2
             return base.GetDiskId();
         }
     }
+    #endif
 
     static class HardwareUtils
     {
@@ -288,30 +285,30 @@ namespace SteamKit2
             public MachineID()
                 : base()
             {
-                this.KeyValues["BB3"] = new KeyValue();
-                this.KeyValues["FF2"] = new KeyValue();
-                this.KeyValues["3B3"] = new KeyValue();
+                this.KeyValues[ "BB3" ] = new KeyValue();
+                this.KeyValues[ "FF2" ] = new KeyValue();
+                this.KeyValues[ "3B3" ] = new KeyValue();
             }
 
 
             public void SetBB3( string value )
             {
-                this.KeyValues["BB3"].Value = value;
+                this.KeyValues[ "BB3" ].Value = value;
             }
 
             public void SetFF2( string value )
             {
-                this.KeyValues["FF2"].Value = value;
+                this.KeyValues[ "FF2" ].Value = value;
             }
 
             public void Set3B3( string value )
             {
-                this.KeyValues["3B3"].Value = value;
+                this.KeyValues[ "3B3" ].Value = value;
             }
 
             public void Set333( string value )
             {
-                this.KeyValues["333"] = new KeyValue( value: value );
+                this.KeyValues[ "333" ] = new KeyValue( value: value );
             }
         }
 

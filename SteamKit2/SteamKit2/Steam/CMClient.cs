@@ -9,7 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
+using Ionic.Zlib;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;

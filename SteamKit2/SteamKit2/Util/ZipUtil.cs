@@ -7,7 +7,7 @@
 
 using System;
 using System.IO;
-using System.IO.Compression;
+using Ionic.Zlib;
 using System.Text;
 
 namespace SteamKit2
