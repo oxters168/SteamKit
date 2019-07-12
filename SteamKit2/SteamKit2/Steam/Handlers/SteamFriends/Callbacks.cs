@@ -1052,5 +1052,28 @@ namespace SteamKit2
                 Name = msg.player_name;
             }
         }
+
+        /// <summary>
+        /// This callback is fired when a game or application is started.
+        /// </summary>
+        public sealed class ClientPlayingSessionStateCallback : CallbackMsg
+        {
+            /// <summary>
+            /// Lets us know if we can open another app/game.
+            /// </summary>
+            public bool PlayingBlocked { get; private set; }
+            /// <summary>
+            /// Tells us what is currently in play.
+            /// </summary>
+            public uint PlayingApp { get; private set; }
+
+            internal ClientPlayingSessionStateCallback( JobID jobID, CMsgClientPlayingSessionState msg )
+            {
+                JobID = jobID;
+
+                PlayingBlocked = msg.playing_blocked;
+                PlayingApp = msg.playing_app;
+            }
+        }
     }
 }

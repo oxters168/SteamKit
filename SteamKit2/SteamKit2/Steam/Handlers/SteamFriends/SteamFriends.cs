@@ -52,6 +52,7 @@ namespace SteamKit2
                 { EMsg.ClientSetIgnoreFriendResponse, HandleIgnoreFriendResponse },
                 { EMsg.ClientFriendProfileInfoResponse, HandleProfileInfoResponse },
                 { EMsg.ClientPersonaChangeResponse, HandlePersonaChangeResponse },
+                { EMsg.ClientPlayingSessionState, HandleClientPlayingSessionState }
             };
         }
 
@@ -1021,6 +1022,13 @@ namespace SteamKit2
             cache.LocalUser.Name = response.Body.player_name;
 
             var callback = new PersonaChangeCallback( packetMsg.TargetJobID, response.Body );
+            Client.PostCallback( callback );
+        }
+        void HandleClientPlayingSessionState( IPacketMsg packetMsg )
+        {
+            var response = new ClientMsgProtobuf<CMsgClientPlayingSessionState>( packetMsg );
+
+            var callback = new ClientPlayingSessionStateCallback( packetMsg.TargetJobID, response.Body );
             Client.PostCallback( callback );
         }
         #endregion
