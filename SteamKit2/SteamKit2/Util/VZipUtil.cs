@@ -14,7 +14,7 @@ namespace SteamKit2
         private static int FooterLength = 10;
 
         private static char Version = 'a';
-
+        private static byte VersionAscii = 97;
 
         public static byte[] Decompress(byte[] buffer)
         {
@@ -63,6 +63,53 @@ namespace SteamKit2
                     return outData;
                 }
             }
+        }
+        public static Stream Decompress( Stream reader )
+        {
+            if ( reader.ReadUInt16() != VZipHeader )
+            {
+                throw new Exception( "Expecting VZipHeader at start of stream" );
+            }
+
+            if ( reader.ReadByte() != VersionAscii )
+            {
+                throw new Exception( "Expecting VZip version 'a'" );
+            }
+
+            // Sometimes this is a creation timestamp (e.g. for Steam Client VZips).
+            // Sometimes this is a CRC32 (e.g. for depot chunks).
+            /* uint creationTimestampOrSecondaryCRC = */
+            reader.ReadUInt32();
+
+            byte[] properties = new byte[ 5 ];
+            reader.Read( properties, 0, 5 );
+            int dataLength = ( int )reader.Length - HeaderLength - FooterLength - 5;
+            long bufferPosition = reader.Position;
+            reader.Seek( dataLength, SeekOrigin.Current );
+            //byte[] compressedBuffer = reader.ReadBytes( ( int )ms.Length - HeaderLength - FooterLength - 5 );
+
+            uint outputCRC = reader.ReadUInt32();
+            uint sizeDecompressed = reader.ReadUInt32();
+
+            if ( reader.ReadUInt16() != VZipFooter )
+            {
+                throw new Exception( "Expecting VZipFooter at end of stream" );
+            }
+
+            SevenZip.Compression.LZMA.Decoder decoder = new SevenZip.Compression.LZMA.Decoder();
+            decoder.SetDecoderProperties( properties );
+
+            reader.Position = bufferPosition;
+            MemoryStream outStream = new MemoryStream( ( int )sizeDecompressed );
+            decoder.Code( reader, outStream, dataLength, sizeDecompressed, null );
+            outStream.Position = 0;
+
+            if ( Crc32.Compute( outStream ) != outputCRC )
+            {
+                throw new InvalidDataException( "CRC does not match decompressed data. VZip data may be corrupted." );
+            }
+
+            return outStream;
         }
 
         public static byte[] Compress(byte[] buffer)

@@ -158,6 +158,8 @@ namespace SteamKit2
             /// </summary>
             public byte[] Data { get; internal set; }
 
+            public Stream DataStream { get; internal set; }
+
 
             /// <summary>
             /// Processes the specified depot key by decrypting the data with the given depot encryption key, and then by decompressing the data.
@@ -175,24 +177,54 @@ namespace SteamKit2
                 if ( IsProcessed )
                     return;
 
-                byte[] processedData = CryptoHelper.SymmetricDecrypt( Data, depotKey );
-
-                if ( processedData.Length > 1 &&  processedData[0] == 'V' && processedData[1] == 'Z' )
+                if ( Data != null )
                 {
-                    processedData = VZipUtil.Decompress( processedData );
+                    byte[] processedData = CryptoHelper.SymmetricDecrypt( Data, depotKey );
+
+                    if ( processedData.Length > 1 && processedData[ 0 ] == 'V' && processedData[ 1 ] == 'Z' )
+                    {
+                        processedData = VZipUtil.Decompress( processedData );
+                    }
+                    else
+                    {
+                        processedData = ZipUtil.Decompress( processedData );
+                    }
+
+                    byte[] dataCrc = CryptoHelper.AdlerHash( processedData );
+
+                    if ( !dataCrc.SequenceEqual( ChunkInfo.Checksum ) )
+                        throw new InvalidDataException( "Processed data checksum is incorrect! Downloaded depot chunk is corrupt or invalid/wrong depot key?" );
+
+                    Data = processedData;
+                    IsProcessed = true;
                 }
-                else
+                if (DataStream != null)
                 {
-                    processedData = ZipUtil.Decompress( processedData );
+                    Stream reProcessedData;
+                    using ( Stream processedData = CryptoHelper.SymmetricDecrypt( DataStream, depotKey ) )
+                    {
+                        int firstByte = processedData.ReadByte();
+                        int secondByte = processedData.ReadByte();
+                        processedData.Position = 0;
+
+                        if ( firstByte == 86 && secondByte == 90 )
+                        {
+                            reProcessedData = VZipUtil.Decompress( processedData );
+                        }
+                        else
+                        {
+                            reProcessedData = ZipUtil.Decompress( processedData );
+                        }
+                    }
+
+                    byte[] dataCrc = CryptoHelper.AdlerHash( reProcessedData );
+
+                    if ( !dataCrc.SequenceEqual( ChunkInfo.Checksum ) )
+                        throw new InvalidDataException( "Processed data checksum is incorrect! Downloaded depot chunk is corrupt or invalid/wrong depot key?" );
+
+                    DataStream = reProcessedData;
+                    IsProcessed = true;
                 }
-
-                byte[] dataCrc = CryptoHelper.AdlerHash( processedData );
-
-                if ( !dataCrc.SequenceEqual( ChunkInfo.Checksum ) )
-                    throw new InvalidDataException( "Processed data checksum is incorrect! Downloaded depot chunk is corrupt or invalid/wrong depot key?" );
-
-                Data = processedData;
-                IsProcessed = true;
             }
         }
 
@@ -554,6 +586,30 @@ namespace SteamKit2
 
             return await DownloadDepotChunkAsync( depotId, chunk, connectedServer, cdnToken, depotKey ).ConfigureAwait( false );
         }
+        /// <summary>
+        /// Downloads the specified depot chunk, does not processes the chunk and verifies the checksum if the depot decryption key has been provided yet.
+        /// </summary>
+        /// <remarks>
+        /// This function will also validate the length of the downloaded chunk with the value of <see cref="DepotManifest.ChunkData.CompressedLength"/>,
+        /// if it has been assigned a value.
+        /// </remarks>
+        /// <param name="depotId">The id of the depot being accessed.</param>
+        /// <param name="chunk">
+        /// A <see cref="DepotManifest.ChunkData"/> instance that represents the chunk to download.
+        /// This value should come from a manifest downloaded with <see cref="o:DownloadManifestAsync"/>.
+        /// </param>
+        /// <returns>A <see cref="DepotChunk"/> instance that contains the data for the given chunk.</returns>
+        /// <exception cref="System.ArgumentNullException">chunk's <see cref="DepotManifest.ChunkData.ChunkID"/> was null.</exception>
+        /// <exception cref="System.IO.InvalidDataException">Thrown if the downloaded data does not match the expected length.</exception>
+        /// <exception cref="HttpRequestException">An network error occurred when performing the request.</exception>
+        /// <exception cref="SteamKitWebRequestException">A network error occurred when performing the request.</exception>
+        public async Task<DepotChunk> DownloadDepotChunkAsStreamAsync( uint depotId, DepotManifest.ChunkData chunk )
+        {
+            depotCdnAuthKeys.TryGetValue( depotId, out var cdnToken );
+            depotKeys.TryGetValue( depotId, out var depotKey );
+
+            return await DownloadDepotChunkAsStreamAsync( depotId, chunk, connectedServer, cdnToken, depotKey ).ConfigureAwait( false );
+        }
 
         /// <summary>
         /// Downloads the specified depot chunk, and optionally processes the chunk and verifies the checksum if the depot decryption key has been provided.
@@ -589,6 +645,41 @@ namespace SteamKit2
             };
 
             return await DownloadDepotChunkAsync( depotId, chunk, server, cdnAuthToken, depotKey ).ConfigureAwait( false );
+        }
+        /// <summary>
+        /// Downloads the specified depot chunk as a stream, does not processes the chunk and verifies the checksum if the depot decryption key has been provided yet.
+        /// </summary>
+        /// <remarks>
+        /// This function will also validate the length of the downloaded chunk with the value of <see cref="DepotManifest.ChunkData.CompressedLength"/>,
+        /// if it has been assigned a value.
+        /// </remarks>
+        /// <param name="depotId">The id of the depot being accessed.</param>
+        /// <param name="chunk">
+        /// A <see cref="DepotManifest.ChunkData"/> instance that represents the chunk to download.
+        /// This value should come from a manifest downloaded with <see cref="o:DownloadManifestAsync"/>.
+        /// </param>
+        /// <returns>A <see cref="DepotChunk"/> instance that contains the data for the given chunk.</returns>
+        /// <param name="host">CDN hostname.</param>
+        /// <param name="cdnAuthToken">CDN auth token for CDN content server endpoints.</param>
+        /// <param name="depotKey">
+        /// The depot decryption key for the depot that will be downloaded.
+        /// This is used for decrypting filenames (if needed) in depot manifests, and processing depot chunks.
+        /// </param>
+        /// <exception cref="System.ArgumentNullException">chunk's <see cref="DepotManifest.ChunkData.ChunkID"/> was null.</exception>
+        /// <exception cref="System.IO.InvalidDataException">Thrown if the downloaded data does not match the expected length.</exception>
+        /// <exception cref="HttpRequestException">An network error occurred when performing the request.</exception>
+        /// <exception cref="SteamKitWebRequestException">A network error occurred when performing the request.</exception>
+        public async Task<DepotChunk> DownloadDepotChunkAsStreamAsync( uint depotId, DepotManifest.ChunkData chunk, string host, string cdnAuthToken, byte[] depotKey = null )
+        {
+            var server = new Server
+            {
+                Protocol = Server.ConnectionProtocol.HTTP,
+                Host = host,
+                VHost = host,
+                Port = 80
+            };
+
+            return await DownloadDepotChunkAsStreamAsync( depotId, chunk, server, cdnAuthToken, depotKey ).ConfigureAwait( false );
         }
 
         /// <summary>
@@ -647,6 +738,80 @@ namespace SteamKit2
                 Data = chunkData,
             };
 
+            if ( depotKey != null )
+            {
+                // if we have the depot key, we can process the chunk immediately
+                depotChunk.Process( depotKey );
+            }
+
+            return depotChunk;
+        }
+        /// <summary>
+        /// Downloads the specified depot chunk as a stream, does not processes the chunk and verifies the checksum if the depot decryption key has been provided yet.
+        /// </summary>
+        /// <remarks>
+        /// This function will also validate the length of the downloaded chunk with the value of <see cref="DepotManifest.ChunkData.CompressedLength"/>,
+        /// if it has been assigned a value.
+        /// </remarks>
+        /// <param name="depotId">The id of the depot being accessed.</param>
+        /// <param name="chunk">
+        /// A <see cref="DepotManifest.ChunkData"/> instance that represents the chunk to download.
+        /// This value should come from a manifest downloaded with <see cref="o:DownloadManifestAsync"/>.
+        /// </param>
+        /// <returns>A <see cref="DepotChunk"/> instance that contains the data for the given chunk.</returns>
+        /// <param name="server">The content server to connect to.</param>
+        /// <param name="cdnAuthToken">CDN auth token for CDN content server endpoints.</param>
+        /// <param name="depotKey">
+        /// The depot decryption key for the depot that will be downloaded.
+        /// This is used for decrypting filenames (if needed) in depot manifests, and processing depot chunks.
+        /// </param>
+        /// <exception cref="System.ArgumentNullException">chunk's <see cref="DepotManifest.ChunkData.ChunkID"/> was null.</exception>
+        /// <exception cref="System.IO.InvalidDataException">Thrown if the downloaded data does not match the expected length.</exception>
+        /// <exception cref="HttpRequestException">An network error occurred when performing the request.</exception>
+        /// <exception cref="SteamKitWebRequestException">A network error occurred when performing the request.</exception>
+        public async Task<DepotChunk> DownloadDepotChunkAsStreamAsync( uint depotId, DepotManifest.ChunkData chunk, Server server, string cdnAuthToken, byte[] depotKey )
+        {
+            if ( server == null )
+            {
+                throw new ArgumentNullException( nameof( server ) );
+            }
+
+            if ( chunk == null )
+            {
+                throw new ArgumentNullException( nameof( chunk ) );
+            }
+
+            if ( chunk.ChunkID == null )
+            {
+                throw new ArgumentException( "Chunk must have a ChunkID.", nameof( chunk ) );
+            }
+
+            var chunkID = Utils.EncodeHexString( chunk.ChunkID );
+
+            Stream stream = await DoRawCommandAsStreamAsync( server, HttpMethod.Get, "depot", doAuth: true, args: string.Format( "{0}/chunk/{1}", depotId, chunkID ), authtoken: cdnAuthToken ).ConfigureAwait( false );
+
+            long fullStreamLength = 0;
+            //using ( stream )
+            //{
+                while (stream.ReadByte() > -1)
+                    fullStreamLength++;
+                stream.Position = 0;
+            //}
+
+            // assert that lengths match only if the chunk has a length assigned.
+            if ( chunk.CompressedLength != default( uint ) && fullStreamLength != chunk.CompressedLength )
+            {
+                throw new InvalidDataException( $"Length mismatch after downloading depot chunk! (was {fullStreamLength}, but should be {chunk.CompressedLength})" );
+            }
+
+            var depotChunk = new DepotChunk
+            {
+                ChunkInfo = chunk,
+                //Data = chunkData,
+                DataStream = stream,
+            };
+
+            //I'll need to do some extra work to process the stream with the depot key. Will come back to this later.
             if ( depotKey != null )
             {
                 // if we have the depot key, we can process the chunk immediately
@@ -721,6 +886,66 @@ namespace SteamKit2
 
                     var responseData = await response.Content.ReadAsByteArrayAsync().ConfigureAwait( false );
                     return responseData;
+                }
+                catch ( Exception ex )
+                {
+                    DebugLog.WriteLine( "CDNClient", "Failed to complete web request to {0}: {1}", url, ex.Message );
+                    throw;
+                }
+            }
+        }
+        async Task<Stream> DoRawCommandAsStreamAsync( Server server, HttpMethod method, string command, string data = null, bool doAuth = false, string args = "", string authtoken = null )
+        {
+            var url = BuildCommand( server, command, args, authtoken );
+            var request = new HttpRequestMessage( method, url );
+
+            if ( doAuth && server.Type == "CS" )
+            {
+                var req = Interlocked.Increment( ref reqCounter );
+
+                byte[] shaHash;
+
+                using ( var ms = new MemoryStream() )
+                using ( var bw = new BinaryWriter( ms ) )
+                {
+                    var uri = new Uri( url );
+
+                    bw.Write( sessionId );
+                    bw.Write( req );
+                    bw.Write( sessionKey );
+                    bw.Write( Encoding.UTF8.GetBytes( uri.AbsolutePath ) );
+
+                    shaHash = CryptoHelper.SHAHash( ms.ToArray() );
+                }
+
+                string hexHash = Utils.EncodeHexString( shaHash );
+                string authHeader = string.Format( "sessionid={0};req-counter={1};hash={2};", sessionId, req, hexHash );
+
+                request.Headers.Add( "x-steam-auth", authHeader );
+            }
+
+            if ( HttpMethod.Post.Equals( method ) )
+            {
+                request.Content = new StringContent( data, Encoding.UTF8 );
+                request.Content.Headers.ContentType = new MediaTypeHeaderValue( "application/x-www-form-urlencoded" );
+            }
+
+            using ( var cts = new CancellationTokenSource() )
+            {
+                cts.CancelAfter( RequestTimeout );
+
+                try
+                {
+                    var response = await httpClient.SendAsync( request, cts.Token ).ConfigureAwait( false );
+
+                    if ( !response.IsSuccessStatusCode )
+                    {
+                        throw new SteamKitWebRequestException( $"Response status code does not indicate success: {response.StatusCode} ({response.ReasonPhrase}).", response );
+                    }
+
+                    return await response.Content.ReadAsStreamAsync().ConfigureAwait( false );
+                    //var responseData = await response.Content.ReadAsByteArrayAsync().ConfigureAwait( false );
+                    //return responseData;
                 }
                 catch ( Exception ex )
                 {

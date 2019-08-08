@@ -59,6 +59,46 @@ namespace SteamKit2
                     return compressedBuffer;
             }
         }
+        public static Stream Decompress( Stream reader )
+        {
+            if ( !PeekHeader( reader, LocalFileHeader ) )
+            {
+                throw new Exception( "Expecting LocalFileHeader at start of stream" );
+            }
+
+            string fileName;
+            UInt32 decompressedSize;
+            UInt16 compressionMethod;
+            Stream compressedStream = ReadLocalFile( reader, out fileName, out decompressedSize, out compressionMethod );
+            //byte[] compressedBuffer = ReadLocalFile( reader, out fileName, out decompressedSize, out compressionMethod );
+
+            if ( !PeekHeader( reader, CentralDirectoryHeader ) )
+            {
+                throw new Exception( "Expecting CentralDirectoryHeader following filename" );
+            }
+
+            string cdrFileName;
+            /*Int32 relativeOffset =*/
+            ReadCentralDirectory( reader, out cdrFileName );
+
+            if ( !PeekHeader( reader, EndOfDirectoryHeader ) )
+            {
+                throw new Exception( "Expecting EndOfDirectoryHeader following CentralDirectoryHeader" );
+            }
+
+            /*UInt32 count =*/
+            ReadEndOfDirectory( reader );
+
+            if ( compressionMethod == DeflateCompression )
+            {
+                using ( compressedStream )
+                {
+                    return InflateBuffer( compressedStream, decompressedSize );
+                }
+            }
+            else
+                return compressedStream;
+        }
 
         public static byte[] Compress( byte[] buffer )
         {
@@ -163,6 +203,12 @@ namespace SteamKit2
 
             return header == expecting;
         }
+        private static bool PeekHeader( Stream stream, UInt32 expecting )
+        {
+            UInt32 header = stream.ReadUInt32();
+
+            return header == expecting;
+        }
 
         private static UInt32 ReadEndOfDirectory( BinaryReader reader )
         {
@@ -176,6 +222,27 @@ namespace SteamKit2
 
             UInt16 commentLength = reader.ReadUInt16();
             /*byte[] comment =*/ reader.ReadBytes( commentLength );
+
+            return CDRCount;
+        }
+        private static UInt32 ReadEndOfDirectory( Stream stream )
+        {
+            /*UInt16 diskNumber =*/
+            stream.ReadUInt16();
+            /*UInt16 CDRDisk =*/
+            stream.ReadUInt16();
+            UInt16 CDRCount = stream.ReadUInt16();
+            /*UInt16 CDRTotal =*/
+            stream.ReadUInt16();
+
+            /*UInt32 CDRSize =*/
+            stream.ReadUInt32();
+            /*Int32 CDROffset =*/
+            stream.ReadUInt32();
+
+            UInt16 commentLength = stream.ReadUInt16();
+            /*byte[] comment =*/
+            stream.Seek( commentLength, SeekOrigin.Current );
 
             return CDRCount;
         }
@@ -216,6 +283,56 @@ namespace SteamKit2
             fileName = Encoding.UTF8.GetString( name );
             return relativeOffset;
         }
+        private static Int32 ReadCentralDirectory( Stream stream, out String fileName )
+        {
+            /*UInt16 versionGenerator =*/
+            stream.ReadUInt16();
+            /*UInt16 versionExtract =*/
+            stream.ReadUInt16();
+            /*UInt16 bitflags =*/
+            stream.ReadUInt16();
+            UInt16 compression = stream.ReadUInt16();
+
+            if ( compression != DeflateCompression && compression != StoreCompression )
+            {
+                throw new Exception( "Invalid compression method " + compression );
+            }
+
+            /*UInt16 modtime =*/
+            stream.ReadUInt16();
+            /*UInt16 createtime =*/
+            stream.ReadUInt16();
+            /*UInt32 crc =*/
+            stream.ReadUInt32();
+
+            /*UInt32 compressedSize =*/
+            stream.ReadUInt32();
+            /*UInt32 decompressedSize =*/
+            stream.ReadUInt32();
+
+            UInt16 nameLength = stream.ReadUInt16();
+            UInt16 fieldLength = stream.ReadUInt16();
+            UInt16 commentLength = stream.ReadUInt16();
+
+            /*UInt16 diskNumber =*/
+            stream.ReadUInt16();
+            /*UInt16 internalAttributes =*/
+            stream.ReadUInt16();
+            /*UInt32 externalAttributes =*/
+            stream.ReadUInt32();
+
+            Int32 relativeOffset = stream.ReadInt32();
+
+            byte[] name = new byte[ nameLength ];
+            stream.Read( name, 0, nameLength );
+            /*byte[] fields =*/
+            stream.Seek( fieldLength, SeekOrigin.Current );
+            /*byte[] comment =*/
+            stream.Seek( commentLength, SeekOrigin.Current );
+
+            fileName = Encoding.UTF8.GetString( name );
+            return relativeOffset;
+        }
 
         private static byte[] ReadLocalFile( BinaryReader reader, out String fileName, out UInt32 decompressedSize, out UInt16 compressionMethod )
         {
@@ -245,7 +362,59 @@ namespace SteamKit2
 
             return reader.ReadBytes( ( int )compressedSize );
         }
+        private static Stream ReadLocalFile( Stream reader, out String fileName, out UInt32 decompressedSize, out UInt16 compressionMethod )
+        {
+            /*UInt16 version =*/
+            reader.ReadUInt16();
+            /*UInt16 bitflags =*/
+            reader.ReadUInt16();
+            compressionMethod = reader.ReadUInt16();
 
+            if ( compressionMethod != DeflateCompression && compressionMethod != StoreCompression )
+            {
+                throw new Exception( "Invalid compression method " + compressionMethod );
+            }
+
+            /*UInt16 modtime =*/
+            reader.ReadUInt16();
+            /*UInt16 createtime =*/
+            reader.ReadUInt16();
+            /*UInt32 crc =*/
+            reader.ReadUInt32();
+
+            UInt32 compressedSize = reader.ReadUInt32();
+            decompressedSize = reader.ReadUInt32();
+
+            UInt16 nameLength = reader.ReadUInt16();
+            UInt16 fieldLength = reader.ReadUInt16();
+
+            byte[] name = new byte[ nameLength ];
+            reader.Read( name, 0, nameLength );
+            /*byte[] fields =*/
+            reader.Seek( fieldLength, SeekOrigin.Current );
+
+            fileName = Encoding.UTF8.GetString( name );
+
+            MemoryStream ms = new MemoryStream((int)compressedSize);
+            CopyTo( reader, ms, compressedSize );
+            ms.Position = 0;
+            return ms;
+        }
+        public static void CopyTo(Stream from, Stream to, long amount, int bufferSize = 81920)
+        {
+            long totalCopied = 0;
+            byte[] buffer = new byte[ bufferSize ];
+            int actualAmountRead;
+            do
+            {
+                int readLength = (int)Math.Min(amount - totalCopied, bufferSize);
+                actualAmountRead = from.Read( buffer, 0, readLength );
+                if ( actualAmountRead > 0 )
+                    to.Write( buffer, 0, actualAmountRead );
+                totalCopied += actualAmountRead;
+            }
+            while ( actualAmountRead > 0 );
+        }
 
         private static byte[] InflateBuffer( byte[] compressedBuffer, UInt32 decompressedSize )
         {
@@ -257,6 +426,20 @@ namespace SteamKit2
 
                 return inflated;
             }
+        }
+        private static Stream InflateBuffer( Stream ms, UInt32 decompressedSize )
+        {
+            MemoryStream stream = new MemoryStream( (int)decompressedSize );
+            //using ( MemoryStream ms = new MemoryStream( compressedBuffer ) )
+            using ( DeflateStream deflateStream = new DeflateStream( ms, CompressionMode.Decompress ) )
+            {
+                //byte[] inflated = new byte[ decompressedSize ];
+                //deflateStream.Read( inflated, 0, inflated.Length );
+
+                CopyTo( deflateStream, stream, decompressedSize );
+            }
+            stream.Position = 0;
+            return stream;
         }
 
         private static byte[] DeflateBuffer( byte[] uncompressedBuffer )

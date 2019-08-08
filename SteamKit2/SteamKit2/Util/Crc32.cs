@@ -57,6 +57,11 @@ namespace SteamKit2
             return ~CalculateHash( InitializeTable( DefaultPolynomial ), DefaultSeed, buffer, 0, buffer.Length );
         }
 
+        public static UInt32 Compute( System.IO.Stream stream )
+        {
+            return ~CalculateHash( InitializeTable( DefaultPolynomial ), DefaultSeed, stream, 0, stream.Length );
+        }
+
         public static UInt32 Compute( UInt32 seed, byte[] buffer )
         {
             return ~CalculateHash( InitializeTable( DefaultPolynomial ), seed, buffer, 0, buffer.Length );
@@ -98,6 +103,19 @@ namespace SteamKit2
                 {
                     crc = ( crc >> 8 ) ^ table[ buffer[ i ] ^ crc & 0xff ];
                 }
+            return crc;
+        }
+        private static UInt32 CalculateHash( UInt32[] table, UInt32 seed, System.IO.Stream stream, long start, long size )
+        {
+            UInt32 crc = seed;
+            long origPos = stream.Position;
+            stream.Position = start;
+            for (int i = 0; i < size; i++)
+                unchecked
+                {
+                    crc = ( crc >> 8 ) ^ table[ stream.ReadByte() ^ crc & 0xff ];
+                }
+            stream.Position = origPos;
             return crc;
         }
 
