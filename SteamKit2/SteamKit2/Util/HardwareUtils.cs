@@ -4,14 +4,20 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Net.NetworkInformation;
 using System.Text;
+
+#if UNITY_STANDALONE_WIN
 using SteamKit2.Util;
-using SteamKit2.Util.MacHelpers;
 using Microsoft.Win32;
+#endif
+
+#if UNITY_STANDALONE_OSX
+using SteamKit2.Util.MacHelpers;
 
 using static SteamKit2.Util.MacHelpers.LibC;
 using static SteamKit2.Util.MacHelpers.CoreFoundation;
 using static SteamKit2.Util.MacHelpers.DiskArbitration;
 using static SteamKit2.Util.MacHelpers.IOKit;
+#endif
 
 namespace SteamKit2
 {
@@ -19,15 +25,15 @@ namespace SteamKit2
     {
         public static MachineInfoProvider GetProvider()
         {
-            #if UNITY_STANDALONE_WIN
+#if UNITY_STANDALONE_WIN
             return new WindowsInfoProvider();
-            #elif UNITY_STANDALONE_LINUX
+#elif UNITY_STANDALONE_LINUX
             return new LinuxInfoProvider();
-            #elif UNITY_STANDALONE_OSX
+#elif UNITY_STANDALONE_OSX
             return new OSXInfoProvider();
-            #else
+#else
             return new DefaultInfoProvider();
-            #endif
+#endif
         }
 
         public abstract byte[] GetMachineGuid();
@@ -72,7 +78,7 @@ namespace SteamKit2
         }
     }
 
-    #if UNITY_STANDALONE_WIN
+#if UNITY_STANDALONE_WIN
     class WindowsInfoProvider : DefaultInfoProvider
     {
         public override byte[] GetMachineGuid()
@@ -108,9 +114,9 @@ namespace SteamKit2
             return Encoding.UTF8.GetBytes( serialNumber );
         }
     }
-    #endif
+#endif
 
-    #if UNITY_STANDALONE_LINUX
+#if UNITY_STANDALONE_LINUX
     class LinuxInfoProvider : DefaultInfoProvider
     {
         public override byte[] GetMachineGuid()
@@ -216,9 +222,9 @@ namespace SteamKit2
             return paramString.Substring( param.Length );
         }
     }
-    #endif
+#endif
 
-    #if UNITY_STANDALONE_OSX
+#if UNITY_STANDALONE_OSX
     class OSXInfoProvider : DefaultInfoProvider
     {
         public override byte[] GetMachineGuid()
@@ -276,7 +282,7 @@ namespace SteamKit2
             return base.GetDiskId();
         }
     }
-    #endif
+#endif
 
     static class HardwareUtils
     {
