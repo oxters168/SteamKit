@@ -34,12 +34,19 @@ namespace SteamKit2.Discovery
                 {
                     using (FileStream fileStream = File.OpenRead(filename))
                     {
-                        return Serializer.DeserializeItems<BasicServerListProto>(fileStream, PrefixStyle.Base128, 1)
-                            .Select(item =>
+                        ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
+                        return model.DeserializeItems<BasicServerListProto>( fileStream, PrefixStyle.Base128, 1 )
+                            .Select( item =>
                             {
-                                return ServerRecord.CreateServer(item.Address, item.Port, item.Protocols);
-                            })
-                            .ToList();
+                                return ServerRecord.CreateServer( item.Address, item.Port, item.Protocols );
+                            } )
+                            .ToList(); ;
+                        //return Serializer.DeserializeItems<BasicServerListProto>(fileStream, PrefixStyle.Base128, 1)
+                        //    .Select(item =>
+                        //    {
+                        //        return ServerRecord.CreateServer(item.Address, item.Port, item.Protocols);
+                        //    })
+                        //    .ToList();
                     }
                 }
                 catch (IOException ex)
@@ -68,8 +75,9 @@ namespace SteamKit2.Discovery
                 {
                     using (var fileStream = File.OpenWrite(filename))
                     {
-                        Serializer.Serialize(fileStream,
-                            endpoints.Select(ep =>
+                        ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
+                        model.Serialize( fileStream,
+                            endpoints.Select( ep =>
                             {
                                 return new BasicServerListProto
                                 {
@@ -77,7 +85,17 @@ namespace SteamKit2.Discovery
                                     Port = ep.GetPort(),
                                     Protocols = ep.ProtocolTypes
                                 };
-                            }));
+                            } ) );
+                        //Serializer.Serialize(fileStream,
+                        //    endpoints.Select(ep =>
+                        //    {
+                        //        return new BasicServerListProto
+                        //        {
+                        //            Address = ep.GetHost(),
+                        //            Port = ep.GetPort(),
+                        //            Protocols = ep.ProtocolTypes
+                        //        };
+                        //    }));
                         fileStream.SetLength(fileStream.Position);
                     }
                 }

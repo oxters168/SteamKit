@@ -134,7 +134,9 @@ namespace SteamKit2
 
             using ( var ms = new MemoryStream() )
             {
-                Serializer.Serialize( ms, message );
+                ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
+                model.Serialize( ms, message );
+                //Serializer.Serialize( ms, message );
                 msg.Body.serialized_method = ms.ToArray();
             }
 

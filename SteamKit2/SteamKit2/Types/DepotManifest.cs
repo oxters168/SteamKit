@@ -217,22 +217,34 @@ namespace SteamKit2
                         case DepotManifest.PROTOBUF_PAYLOAD_MAGIC:
                             uint payload_length = br.ReadUInt32();
                             byte[] payload_bytes = br.ReadBytes( (int)payload_length );
-                            using ( var ms_payload = new MemoryStream( payload_bytes ) ) 
-                                payload = Serializer.Deserialize<ContentManifestPayload>( ms_payload );
+                            using ( var ms_payload = new MemoryStream( payload_bytes ) )
+                            {
+                                ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
+                                payload = ( ContentManifestPayload )model.Deserialize( ms_payload, null, typeof( ContentManifestPayload ) );
+                                //payload = Serializer.Deserialize<ContentManifestPayload>( ms_payload );
+                            }
                             break;
 
                         case DepotManifest.PROTOBUF_METADATA_MAGIC:
                             uint metadata_length = br.ReadUInt32();
                             byte[] metadata_bytes = br.ReadBytes( (int)metadata_length );
                             using ( var ms_metadata = new MemoryStream( metadata_bytes ) )
-                                metadata = Serializer.Deserialize<ContentManifestMetadata>( ms_metadata );
+                            {
+                                ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
+                                metadata = ( ContentManifestMetadata )model.Deserialize( ms_metadata, null, typeof( ContentManifestMetadata ) );
+                                //metadata = Serializer.Deserialize<ContentManifestMetadata>( ms_metadata );
+                            }
                             break;
 
                         case DepotManifest.PROTOBUF_SIGNATURE_MAGIC:
                             uint signature_length = br.ReadUInt32();
                             byte[] signature_bytes = br.ReadBytes( (int)signature_length );
                             using ( var ms_signature = new MemoryStream( signature_bytes ) )
-                                signature = Serializer.Deserialize<ContentManifestSignature>( ms_signature );
+                            {
+                                ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
+                                signature = ( ContentManifestSignature )model.Deserialize( ms_signature, null, typeof( ContentManifestSignature ) );
+                                //signature = Serializer.Deserialize<ContentManifestSignature>( ms_signature );
+                            }
                             break;
 
                         case DepotManifest.PROTOBUF_ENDOFMANIFEST_MAGIC:

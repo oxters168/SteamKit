@@ -130,7 +130,9 @@ namespace SteamKit2.GC
             using ( MemoryStream ms = new MemoryStream() )
             {
                 Header.Serialize( ms );
-                Serializer.Serialize( ms, Body );
+                ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
+                model.Serialize( ms, Body );
+                //Serializer.Serialize( ms, Body );
                 Payload.WriteTo( ms );
 
                 return ms.ToArray();
@@ -150,7 +152,9 @@ namespace SteamKit2.GC
             using ( MemoryStream ms = new MemoryStream( data ) )
             {
                 Header.Deserialize( ms );
-                Body = Serializer.Deserialize<BodyType>( ms );
+                ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
+                Body = ( BodyType )model.Deserialize( ms, null, typeof( BodyType ) );
+                //Body = Serializer.Deserialize<BodyType>( ms );
 
                 // the rest of the data is the payload
                 int payloadOffset = ( int )ms.Position;

@@ -3,7 +3,7 @@
 namespace SteamKit2.Discovery
 {
     [ProtoContract]
-    class BasicServerListProto
+    public class BasicServerListProto
     {
         [ProtoMember(1)]
         public string Address { get; set; }
