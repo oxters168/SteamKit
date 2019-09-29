@@ -71,9 +71,7 @@ namespace SteamKit2
             {
                 using ( var ms = new MemoryStream( ResponseRaw ) )
                 {
-                    ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
-                    return ( T )model.Deserialize( ms, null, typeof( T ) );
-                    //return Serializer.Deserialize<T>( ms );
+                    return Serializer.Deserialize<T>( ms );
                 }
             }
         }

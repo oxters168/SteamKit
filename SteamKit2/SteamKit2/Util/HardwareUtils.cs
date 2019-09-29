@@ -25,7 +25,7 @@ namespace SteamKit2
     {
         public static MachineInfoProvider GetProvider()
         {
-#if BLA //Supposed to be UNITY_STANDALONE_WIN
+#if UNITY_STANDALONE_WIN
             return new WindowsInfoProvider();
 #elif UNITY_STANDALONE_LINUX
             return new LinuxInfoProvider();
@@ -78,7 +78,7 @@ namespace SteamKit2
         }
     }
 
-#if BLA //Supposed to be UNITY_STANDALONE_WIN
+#if UNITY_STANDALONE_WIN
     class WindowsInfoProvider : DefaultInfoProvider
     {
         public override byte[] GetMachineGuid()

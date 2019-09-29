@@ -347,10 +347,8 @@ namespace SteamKit2.Internal
 		public void Serialize(Stream stream)
 		{
 			MemoryStream msProto = new MemoryStream();
-            ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
-            model.Serialize( msProto, Proto );
-            //ProtoBuf.Serializer.Serialize<SteamKit2.Internal.CMsgProtoBufHeader>(msProto, Proto);
-            HeaderLength = (int)msProto.Length;
+			ProtoBuf.Serializer.Serialize<SteamKit2.Internal.CMsgProtoBufHeader>(msProto, Proto);
+			HeaderLength = (int)msProto.Length;
 			BinaryWriter bw = new BinaryWriter( stream );
 
 			bw.Write( (int)MsgUtil.MakeMsg( Msg, true ) );
@@ -366,12 +364,8 @@ namespace SteamKit2.Internal
 
 			Msg = (EMsg)MsgUtil.GetMsg( (uint)br.ReadInt32() );
 			HeaderLength = br.ReadInt32();
-            using ( MemoryStream msProto = new MemoryStream( br.ReadBytes( HeaderLength ) ) )
-            {
-                ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
-                Proto = (SteamKit2.Internal.CMsgProtoBufHeader)model.Deserialize(msProto, null, typeof(SteamKit2.Internal.CMsgProtoBufHeader));
-                //Proto = ProtoBuf.Serializer.Deserialize<SteamKit2.Internal.CMsgProtoBufHeader>( msProto );
-            }
+			using( MemoryStream msProto = new MemoryStream( br.ReadBytes( HeaderLength ) ) )
+				Proto = ProtoBuf.Serializer.Deserialize<SteamKit2.Internal.CMsgProtoBufHeader>( msProto );
 		}
 	}
 
@@ -397,10 +391,8 @@ namespace SteamKit2.Internal
 		public void Serialize(Stream stream)
 		{
 			MemoryStream msProto = new MemoryStream();
-            ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
-            model.Serialize( msProto, Proto );
-            //ProtoBuf.Serializer.Serialize<SteamKit2.GC.Internal.CMsgProtoBufHeader>(msProto, Proto);
-            HeaderLength = (int)msProto.Length;
+			ProtoBuf.Serializer.Serialize<SteamKit2.GC.Internal.CMsgProtoBufHeader>(msProto, Proto);
+			HeaderLength = (int)msProto.Length;
 			BinaryWriter bw = new BinaryWriter( stream );
 
 			bw.Write( MsgUtil.MakeGCMsg( Msg, true ) );
@@ -416,12 +408,8 @@ namespace SteamKit2.Internal
 
 			Msg = MsgUtil.GetGCMsg( (uint)br.ReadUInt32() );
 			HeaderLength = br.ReadInt32();
-            using ( MemoryStream msProto = new MemoryStream( br.ReadBytes( HeaderLength ) ) )
-            {
-                ProtoBuf.Meta.TypeModel model = ( ProtoBuf.Meta.TypeModel )Activator.CreateInstance( Type.GetType( "MyProtoModel, MyProtoModel" ) );
-                Proto = (SteamKit2.GC.Internal.CMsgProtoBufHeader)model.Deserialize( msProto, null, typeof( SteamKit2.GC.Internal.CMsgProtoBufHeader ) );
-                //Proto = ProtoBuf.Serializer.Deserialize<SteamKit2.GC.Internal.CMsgProtoBufHeader>( msProto );
-            }
+			using( MemoryStream msProto = new MemoryStream( br.ReadBytes( HeaderLength ) ) )
+				Proto = ProtoBuf.Serializer.Deserialize<SteamKit2.GC.Internal.CMsgProtoBufHeader>( msProto );
 		}
 	}
 
