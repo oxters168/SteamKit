@@ -70,11 +70,10 @@ namespace SteamKit2
             this.AddHandler( new SteamUnifiedMessages() );
             this.AddHandler( new SteamScreenshots() );
 
-            //using ( var process = Process.GetCurrentProcess() )
-            //{
-            //    this.processStartTime = process.StartTime;
-            //}
-            this.processStartTime = DateTime.UtcNow;
+            using ( var process = Process.GetCurrentProcess() )
+            {
+                this.processStartTime = process.StartTime;
+            }
 
             dispatchMap = new Dictionary<EMsg, Action<IPacketMsg>>
             {
